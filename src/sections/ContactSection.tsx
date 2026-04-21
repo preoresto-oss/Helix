@@ -25,6 +25,8 @@ export default function ContactSection() {
   const imageRef = useRef<HTMLDivElement>(null);
   const [formData, setFormData] = useState({ name: '', email: '', company: '', message: '' });
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useLayoutEffect(() => {
     const section = sectionRef.current;
@@ -63,10 +65,43 @@ export default function ContactSection() {
     return () => ctx.revert();
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
-    setTimeout(() => setSubmitted(false), 3000);
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const res = await fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          access_key: '2260b448-cc47-4d43-838b-d348816ddcfd',
+          subject: `New Helix AI inquiry from ${formData.name || 'website visitor'}`,
+          from_name: 'Helix AI Website',
+          name: formData.name,
+          email: formData.email,
+          company: formData.company,
+          message: formData.message,
+          source: 'helix-consulting.biz contact form',
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data?.message || 'Submission failed. Please try again or email admin@helix-consulting.biz directly.');
+      }
+
+      setSubmitted(true);
+      setFormData({ name: '', email: '', company: '', message: '' });
+      setTimeout(() => setSubmitted(false), 6000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please email admin@helix-consulting.biz directly.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -145,11 +180,18 @@ export default function ContactSection() {
                     className="w-full bg-helix-bg border border-helix-bg rounded-lg px-4 py-3 text-helix-text text-sm focus:outline-none focus:border-helix-accent transition-colors resize-none"
                     placeholder="Tell us about your biggest operational frustration..." />
                 </div>
-                <button type="submit" className="btn-primary w-full justify-center">
-                  Send
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <path d="M3 8h10M10 5l3 3-3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                {error && (
+                  <div className="rounded-lg px-4 py-3 text-sm" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                    {error}
+                  </div>
+                )}
+                <button type="submit" disabled={submitting} className="btn-primary w-full justify-center" style={submitting ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}>
+                  {submitting ? 'Sending...' : 'Send'}
+                  {!submitting && (
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                      <path d="M3 8h10M10 5l3 3-3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
                 </button>
               </form>
             )}
